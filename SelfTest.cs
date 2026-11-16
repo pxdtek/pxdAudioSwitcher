@@ -242,6 +242,44 @@ internal static class SelfTest
         Check(r, "migration: nothing to move on a fresh install", !Services.Migration.DataFolder(Path.Combine(root, "empty")));
     }
 
+    /// <summary>
+    /// A device that comes back from a replug with a new id (sample devices, in memory only): its cycle tick and profile
+    /// choice carry over when the match is unambiguous, and nothing changes when it isn't.
+    /// </summary>
+    public static void Replug(StringBuilder r)
+    {
+        // "headset" is plugged in but unknown; "old-headset" is remembered under the same name and has gone.
+        AppSettings Make(params string[] missingWithHeadsetName)
+        {
+            var s = new AppSettings { ReadOnly = true, PlaybackCycle = { "spk", "old-headset" } };
+            s.Profiles.Add(new Profile { Name = "Gaming", PlaybackId = "old-headset" });
+            foreach (var d in new[] { ("spk", "Speakers (USB Audio)"), ("tv", "TV (HDMI Audio)"), ("studio", "Studio Mic (USB Audio)"),
+                         ("headset-mic", "Headset Microphone (Wireless Headset)"), ("webcam", "Microphone (HD Webcam)") })
+                s.KnownNames[d.Item1] = d.Item2;
+            foreach (var id in missingWithHeadsetName)
+                s.KnownNames[id] = "Headset (Wireless Headset)";
+            return s;
+        }
+
+        var one = Make("old-headset");
+        using (var sw = new Switcher(one, Sample()))
+        {
+            var changed = sw.AdoptReplugged(sw.Audio.List(EDataFlow.Render).Concat(sw.Audio.List(EDataFlow.Capture)).ToList());
+            Check(r, "replug: new id joins the cycle next to the old one",
+                changed && one.PlaybackCycle.Contains("headset") && one.PlaybackCycle.Contains("old-headset"), string.Join(",", one.PlaybackCycle));
+            Check(r, "replug: profile follows the new id", one.Profiles[0].PlaybackId == "headset", one.Profiles[0].PlaybackId);
+            Check(r, "replug: cycle now includes the replugged device", sw.CycleList(EDataFlow.Render).Any(d => d.Id == "headset"));
+        }
+
+        var two = Make("old-headset", "older-headset");
+        using (var sw = new Switcher(two, Sample()))
+        {
+            var changed = sw.AdoptReplugged(sw.Audio.List(EDataFlow.Render).Concat(sw.Audio.List(EDataFlow.Capture)).ToList());
+            Check(r, "replug: two missing devices with that name -> nothing guessed",
+                !changed && !two.PlaybackCycle.Contains("headset") && two.Profiles[0].PlaybackId == "old-headset");
+        }
+    }
+
     /// <summary>Saves a size, restores it, restores a spot on screen, and ignores a spot that is on no screen.</summary>
     public static void Placement(StringBuilder r)
     {

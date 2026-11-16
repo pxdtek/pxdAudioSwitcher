@@ -45,6 +45,7 @@ public partial class App : Application
                     SelfTest.Migration(report);
                     SelfTest.Update(report);
                     SelfTest.Audio(report);
+                    SelfTest.Replug(report);
                     using (var sw = new Switcher(interactive: false))
                         SelfTest.Window(report, sw);
                     SelfTest.Placement(report);

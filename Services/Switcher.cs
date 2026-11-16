@@ -76,8 +76,9 @@ public sealed class Switcher : IDisposable
 
     private void RememberNames()
     {
-        var changed = false;
-        foreach (var d in Audio.List(EDataFlow.Render).Concat(Audio.List(EDataFlow.Capture)))
+        var present = Audio.List(EDataFlow.Render).Concat(Audio.List(EDataFlow.Capture)).ToList();
+        var changed = AdoptReplugged(present);
+        foreach (var d in present)
         {
             if (Settings.KnownNames.TryGetValue(d.Id, out var n) && n == d.FullName)
                 continue;
@@ -90,6 +91,61 @@ public sealed class Switcher : IDisposable
     }
 
     /// <summary>The devices the hotkey cycles through right now: the chosen ones that are plugged in, or all of them.</summary>
+    /// <summary>
+    /// A USB device that drops out and is plugged back in (or comes back on another port) can return from Windows with
+    /// a brand-new device id. When a device we have never seen shows up with exactly the name of a remembered device that
+    /// is no longer there, it is taken to be that device: its place in the cycles is shared with the new id, and profiles
+    /// that pointed at the old id point at the new one. Only an unambiguous match counts (one new device, one missing
+    /// device, same name). Returns whether anything changed.
+    /// </summary>
+    internal bool AdoptReplugged(List<AudioDevice> present)
+    {
+        var presentIds = present.Select(d => d.Id).ToHashSet();
+        var changed = false;
+        foreach (var fresh in present.Where(d => !Settings.KnownNames.ContainsKey(d.Id)))
+        {
+            if (present.Count(d => d.FullName == fresh.FullName) != 1)
+                continue;
+            var missing = Settings.KnownNames
+                .Where(kv => kv.Value == fresh.FullName && !presentIds.Contains(kv.Key) && SameFlow(kv.Key, fresh.Flow))
+                .Select(kv => kv.Key)
+                .ToList();
+            if (missing.Count != 1)
+                continue;
+            var old = missing[0];
+
+            var cycle = fresh.Flow == EDataFlow.Render ? Settings.PlaybackCycle : Settings.RecordingCycle;
+            if (cycle.Contains(old) && !cycle.Contains(fresh.Id))
+            {
+                // Kept next to the old id rather than replacing it: if the old one ever comes back, it is still ticked.
+                cycle.Add(fresh.Id);
+                changed = true;
+            }
+
+            foreach (var p in Settings.Profiles)
+            {
+                if (fresh.Flow == EDataFlow.Render && p.PlaybackId == old)
+                {
+                    p.PlaybackId = fresh.Id;
+                    changed = true;
+                }
+                else if (fresh.Flow == EDataFlow.Capture && p.RecordingId == old)
+                {
+                    p.RecordingId = fresh.Id;
+                    changed = true;
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>Endpoint ids start with {0.0.0.…} for playback and {0.0.1.…} for recording.</summary>
+    private static bool SameFlow(string id, EDataFlow flow) =>
+        id.StartsWith("{0.0.0.", StringComparison.Ordinal) ? flow == EDataFlow.Render
+        : id.StartsWith("{0.0.1.", StringComparison.Ordinal) ? flow == EDataFlow.Capture
+        : true;
+
     public List<AudioDevice> CycleList(EDataFlow flow)
     {
         var all = Audio.List(flow);

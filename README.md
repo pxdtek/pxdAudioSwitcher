@@ -8,7 +8,7 @@
 
 ## Features
 
-- **Cycle hotkeys.** <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F11</kbd> steps through playback devices and <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F7</kbd> through microphones. Tick the devices you actually use; the rest are skipped. Unplugged devices are skipped too, and remembered for when they come back.
+- **Cycle hotkeys.** <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F11</kbd> steps through playback devices and <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F7</kbd> through microphones. Tick the devices you actually use; the rest are skipped. Unplugged devices are skipped too, and remembered for when they come back, even when Windows hands a replugged USB device a new identity (it is recognised by its name when the match is unambiguous).
 - **Microphone mute** on its own hotkey (<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>), from the tray menu, or with the button in the window.
 - **Pick any device directly** with its **Use** button, or from the tray menu.
 - **Profiles.** A playback and microphone pair (either side can be "leave as it is") with its own hotkey.
